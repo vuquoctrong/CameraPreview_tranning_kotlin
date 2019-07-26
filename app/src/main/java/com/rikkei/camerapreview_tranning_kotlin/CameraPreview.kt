@@ -5,8 +5,8 @@ import android.hardware.Camera
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import java.io.IOException
 
+@Suppress("DEPRECATION")
 class CameraPreview(context: Context, private var mCamera: Camera, mSurfaceView: SurfaceView): SurfaceView(context),SurfaceHolder.Callback{
     private val TAG = CameraPreview::class.java.toString()
     private val mHolder: SurfaceHolder = mSurfaceView!!.holder.apply {
@@ -15,19 +15,17 @@ class CameraPreview(context: Context, private var mCamera: Camera, mSurfaceView:
     }
 
     override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
-        mCamera.apply {
-           setDisplayOrientation(90)
-            try {
-                setPreviewDisplay(holder)
-                startPreview()
-            } catch (e: IOException) {
-                Log.d(TAG, "Error setting camera preview: ${e.message}")
-            }
+        try {
+            mCamera!!.setPreviewDisplay(holder)
+            mCamera!!.startPreview()
+        } catch (e: Exception) {
+            // intentionally left blank for a test
         }
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder?) {
-
+        mCamera!!.stopPreview()
+        mCamera!!.release()
 
     }
 
@@ -48,8 +46,10 @@ class CameraPreview(context: Context, private var mCamera: Camera, mSurfaceView:
         // reformatting changes here
 
         // start preview with new settings
+
         mCamera.apply {
             try {
+                setDisplayOrientation(90)
                 setPreviewDisplay(mHolder)
                 startPreview()
             } catch (e: Exception) {
@@ -57,4 +57,5 @@ class CameraPreview(context: Context, private var mCamera: Camera, mSurfaceView:
             }
         }
     }
+
 }

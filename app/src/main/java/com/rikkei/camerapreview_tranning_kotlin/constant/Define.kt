@@ -5,5 +5,6 @@ class Define {
         const val MY_CAMERA_REQUEST_CODE = 100
         const val MEDIA_TYPE_IMAGE = 1
         const val MEDIA_TYPE_VIDEO = 2
+        const val  ASPECT_TOLERANCE = 0.05
     }
 }

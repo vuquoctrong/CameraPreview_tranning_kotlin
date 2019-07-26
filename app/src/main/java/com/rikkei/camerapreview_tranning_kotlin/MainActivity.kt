@@ -1,28 +1,35 @@
+@file:Suppress("DEPRECATION")
+
 package com.rikkei.camerapreview_tranning_kotlin
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Dialog
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.hardware.Camera
 import android.media.CamcorderProfile
 import android.media.MediaRecorder
 import android.os.Build
-import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
 import android.support.annotation.RequiresApi
+import android.support.v7.app.AppCompatActivity
 import android.util.Log
 import android.view.SurfaceHolder
 import android.widget.Toast
 import com.rikkei.tra_02t0114camera.constant.Define
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.android.synthetic.main.dialog_setting_previewsize.*
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
 
+@Suppress("DEPRECATION", "PrivatePropertyName", "SpellCheckingInspection")
 class MainActivity : AppCompatActivity() {
 
     private var mCamera: Camera? = null
@@ -30,7 +37,7 @@ class MainActivity : AppCompatActivity() {
     private var msurfaceHolder: SurfaceHolder? = null
     private var mPicture: Camera.PictureCallback? = null
     private var frontCam: Boolean = false
-    private var mediaRecorder: MediaRecorder?= null
+    private var mediaRecorder: MediaRecorder? = null
     private var isRecording = false
 
     private val TAG = MainActivity::class.java.toString()
@@ -55,6 +62,7 @@ class MainActivity : AppCompatActivity() {
         mCameraPreview = mCamera?.let {
             CameraPreview(this, it, surfaceView)
         }
+        //đổi cam trước sau
         ivRotateCamera.setOnClickListener { roTateCamera() }
 
         mPicture = Camera.PictureCallback { data, _ ->
@@ -72,55 +80,45 @@ class MainActivity : AppCompatActivity() {
                 Log.d(TAG, "Error accessing file: ${e.message}")
             }
         }
-
+        // saveImage
         ivCamera.setOnClickListener {
-            mCamera?.takePicture(null,null,mPicture)
+            mCamera?.takePicture(null, null, mPicture)
             refreshCamera()
         }
 
-        mediaRecorder?.apply {
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT)
-            setVideoEncoder(MediaRecorder.VideoEncoder.DEFAULT)
-        }
-
+        // open video
+        ivVideo.setBackgroundResource(R.drawable.video64)
         ivVideo.setOnClickListener {
             if (isRecording) {
-                // stop recording and release camera
-                mediaRecorder?.stop() // stop the recording
-                releaseMediaRecorder() // release the MediaRecorder object
-                mCamera?.lock() // take camera access back from MediaRecorder
-
-                // inform the user that recording has stopped
-               // setCaptureButtonText("Capture")
+                it.setBackgroundResource(R.drawable.pausevideo)
+                mediaRecorder?.stop()
+                releaseMediaRecorder()
+                mCamera?.lock()
                 isRecording = false
             } else {
-                // initialize video camera
                 if (prepareVideoRecorder()) {
-                    // Camera is available and unlocked, MediaRecorder is prepared,
-                    // now you can start recording
+                    it.setBackgroundResource(R.drawable.video64)
                     mediaRecorder?.start()
-
-                    // inform the user that recording has started
-                  //  setCaptureButtonText("Stop")
+                    it.setBackgroundResource(R.drawable.pausevideo)
                     isRecording = true
                 } else {
-                    // prepare didn't work, release the camera
                     releaseMediaRecorder()
-                    // inform user
                 }
             }
+        }
+
+        // preview size camera
+        ivSetting.setOnClickListener {
+            showDialogSettingSize()
         }
 
     }
 
     private fun getCameraInstance(): Camera? {
         return try {
-            Camera.open() // attempt to get a Camera instance
+            Camera.open()
         } catch (e: Exception) {
-            // Camera is not available (in use or does not exist)
-            null // returns null if camera is unavailable
-
+            null
         }
     }
 
@@ -212,6 +210,7 @@ class MainActivity : AppCompatActivity() {
         }
         return cameraId
     }
+
     private fun refreshCamera() {
         if (msurfaceHolder!!.surface == null) return
 
@@ -229,18 +228,13 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    @SuppressLint("SimpleDateFormat")
     private fun getOutputMediaFile(type: Int): File? {
-        // To be safe, you should check that the SDCard is mounted
-        // using Environment.getExternalStorageState() before doing this.
-
         val mediaStorageDir = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
             "MyCameraApp"
         )
-        // This location works best if you want the created images to be shared
-        // between applications and persist after your app has been uninstalled.
 
-        // Create the storage directory if it does not exist
         mediaStorageDir.apply {
             if (!exists()) {
                 if (!mkdirs()) {
@@ -249,10 +243,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-
-        // Create a media file name
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
-        Log.d("LOL","${mediaStorageDir.path}${File.separator}IMG_$timeStamp.jpg")
+        Log.d(TAG, "${mediaStorageDir.path}${File.separator}IMG_$timeStamp.jpg")
         return when (type) {
             Define.MEDIA_TYPE_IMAGE -> {
                 File("${mediaStorageDir.path}${File.separator}IMG_$timeStamp.jpg")
@@ -264,70 +256,126 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-
     private fun prepareVideoRecorder(): Boolean {
         mediaRecorder = MediaRecorder()
-
-        mCamera?.let { camera ->
-            // Step 1: Unlock and set camera to MediaRecorder
-            camera?.unlock()
-
-            mediaRecorder?.run {
-                setCamera(camera)
-
-                // Step 2: Set sources
-                setAudioSource(MediaRecorder.AudioSource.CAMCORDER)
-                setVideoSource(MediaRecorder.VideoSource.CAMERA)
-
-                // Step 3: Set a CamcorderProfile (requires API Level 8 or higher)
-                setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH))
-
-                // Step 4: Set output file
-                setOutputFile(getOutputMediaFile(Define.MEDIA_TYPE_VIDEO).toString())
-
-                // Step 5: Set the preview output
-                setPreviewDisplay(mCameraPreview?.holder?.surface)
-
-                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT)
-                setVideoEncoder(MediaRecorder.VideoEncoder.DEFAULT)
-
-
-                // Step 6: Prepare configured MediaRecorder
-                return try {
-                    prepare()
-                    true
-                } catch (e: IllegalStateException) {
-                    Log.d(TAG, "IllegalStateException preparing MediaRecorder: ${e.message}")
-                    releaseMediaRecorder()
-                    false
-                } catch (e: IOException) {
-                    Log.d(TAG, "IOException preparing MediaRecorder: ${e.message}")
-                    releaseMediaRecorder()
-                    false
-                }
+        mCamera?.unlock()
+        mediaRecorder?.run {
+            setCamera(mCamera)
+            setAudioSource(MediaRecorder.AudioSource.CAMCORDER)
+            setVideoSource(MediaRecorder.VideoSource.CAMERA)
+            setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH))
+//            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setOutputFile(getOutputMediaFile(Define.MEDIA_TYPE_VIDEO).toString())
+            setVideoSize(640, 480)
+            setVideoFrameRate(30)
+            setPreviewDisplay(mCameraPreview?.holder?.surface)
+//            setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT)
+//            setVideoEncoder(MediaRecorder.VideoEncoder.DEFAULT)
+            return try {
+                prepare()
+                true
+            } catch (e: IllegalStateException) {
+                Log.d(TAG, "IllegalStateException preparing MediaRecorder: ${e.message}")
+                releaseMediaRecorder()
+                false
+            } catch (e: IOException) {
+                Log.d(TAG, "IOException preparing MediaRecorder: ${e.message}")
+                releaseMediaRecorder()
+                false
             }
-
         }
         return false
     }
 
+    //set preivew size
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+    private fun getOptimalPreviewSize(sizes: MutableList<Camera.Size>, w: Int, h: Int): Camera.Size? {
+        val targetRatio = w.toDouble() / h
+        var optimalSize: Camera.Size? = null
+        var minDiff = java.lang.Double.MAX_VALUE
+
+        // Try to find an size match aspect ratio and size
+        for (size in sizes) {
+            val ratio = size.width.toDouble() / size.height
+            if (abs(ratio - targetRatio) > Define.ASPECT_TOLERANCE) continue
+            if (abs(size.height - h) < minDiff) {
+                optimalSize = size
+                minDiff = abs(size.height - h).toDouble()
+            }
+        }
+
+        // Cannot find the one match the aspect ratio, ignore the requirement
+        if (optimalSize == null) {
+            minDiff = java.lang.Double.MAX_VALUE
+            for (size in sizes) {
+                if (abs(size.height - h) < minDiff) {
+                    optimalSize = size
+                    minDiff = abs(size.height - h).toDouble()
+                }
+            }
+        }
+        return optimalSize
+    }
+
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+    private fun setPreviewSize(width: Int, height: Int) {
+        val parameters = mCamera?.parameters
+        val sizes = parameters?.supportedPreviewSizes
+        val optimalSize = getOptimalPreviewSize(sizes as MutableList<Camera.Size>, width, height)
+        if (optimalSize != null) {
+            parameters.setPreviewSize(optimalSize.width, optimalSize.height)
+        }
+        mCamera?.parameters = parameters
+        mCamera?.startPreview()
+
+    }
+
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+    private fun showDialogSettingSize() {
+        val dialog = Dialog(this)
+        dialog.apply {
+            setCancelable(true)
+            setContentView(R.layout.dialog_setting_previewsize)
+            show()
+        }
+        var width: Int
+        var height: Int
+        dialog.tv1920x1280.setOnClickListener {
+            width = 1280
+            height = 1920
+            setPreviewSize(width, height)
+            dialog.dismiss()
+        }
+        dialog.tv1280x960.setOnClickListener {
+            width = 960
+            height = 1280
+            setPreviewSize(width, height)
+            dialog.dismiss()
+        }
+        dialog.tv640x320.setOnClickListener {
+            width = 320
+            height = 640
+            setPreviewSize(width, height)
+            dialog.dismiss()
+        }
+
+    }
+
     override fun onPause() {
         super.onPause()
-        releaseMediaRecorder() // if you are using MediaRecorder, release it first
-        releaseCamera() // release the camera immediately on pause event
+        releaseMediaRecorder()
+        releaseCamera()
     }
 
     private fun releaseMediaRecorder() {
-        mediaRecorder?.reset() // clear recorder configuration
-        mediaRecorder?.release() // release the recorder object
+        mediaRecorder?.reset()
+        mediaRecorder?.release()
         mediaRecorder = null
-        mCamera?.lock() // lock camera for later use
+        mCamera?.lock()
     }
 
     private fun releaseCamera() {
-        mCamera?.release() // release the camera for other applications
+        mCamera?.release()
         mCamera = null
     }
 
@@ -335,7 +383,6 @@ class MainActivity : AppCompatActivity() {
         super.onConfigurationChanged(config)
         changeOrientation()
     }
-
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
